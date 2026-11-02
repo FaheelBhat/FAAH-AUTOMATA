@@ -1,0 +1,100 @@
+name: Build Faah Autonomous Binaries
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: Faah-Autonomous-macOS
+            asset_name: Faah-Autonomous-macOS.zip
+            run_pyinstaller: |
+              pyinstaller --noconfirm --onedir --windowed --name "Faah-Autonomous" \
+                --hidden-import "engineio.async_drivers.threading" \
+                --collect-all "pyautogui" \
+                --collect-all "pynput" \
+                --collect-all "qrcode" \
+                --collect-all "PIL" \
+                app.py
+              cd dist && zip -r Faah-Autonomous-macOS.zip Faah-Autonomous.app Faah-Autonomous
+
+          - os: windows-latest
+            artifact_name: Faah-Autonomous-Windows
+            asset_name: Faah-Autonomous-Windows.zip
+            run_pyinstaller: |
+              pyinstaller --noconfirm --onefile --console --name "Faah-Autonomous" `
+                --collect-all "pyautogui" `
+                --collect-all "pynput" `
+                --collect-all "qrcode" `
+                --collect-all "PIL" `
+                app.py
+              Compress-Archive -Path dist\Faah-Autonomous.exe -DestinationPath dist\Faah-Autonomous-Windows.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Standalone Application
+        shell: bash
+        if: runner.os == 'macOS'
+        run: ${{ matrix.run_pyinstaller }}
+
+      - name: Build Standalone Application (Windows)
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: ${{ matrix.run_pyinstaller }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.asset_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display downloaded artifacts
+        run: ls -R artifacts
+
+      - name: Release Packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/Faah-Autonomous-macOS/Faah-Autonomous-macOS.zip
+            artifacts/Faah-Autonomous-Windows/Faah-Autonomous-Windows.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -1,10 +1,8 @@
 """
-Phone-to-PC Auto-Typer Server (app.py)
---------------------------------------
-Web server for receiving text from your phone and typing it directly into PC applications.
-Automatically focuses Google Chrome / Google Docs before streaming characters.
-Features configurable WPM (Words Per Minute) typing speed control.
-Opens a crisp QR code directly in macOS Preview so your phone can scan it instantly.
+Faah Autonomous (FAAH-AUTOMATA)
+--------------------------------
+Cross-platform phone-to-PC auto-typer with human-like cadence, WPM speed control,
+and automatic browser focus (macOS & Windows).
 """
 
 import os
@@ -21,17 +19,29 @@ import pyperclip
 
 app = Flask(__name__)
 
-# --- Native AppleScript Chrome Focus Helper ---
+# --- Cross-Platform Window Focus Helper ---
 def focus_chrome():
-    """Executes a native macOS AppleScript to bring Google Chrome to the foreground automatically."""
+    """Brings Google Chrome to the foreground on macOS or Windows."""
     print("[Focus] Locating and focusing Google Chrome...")
-    applescript = """
-    tell application "Google Chrome"
-        activate
-    end tell
-    """
-    os.system(f"osascript -e '{applescript}'")
-    time.sleep(1.0) # Small safety pause to let Chrome render on top
+    try:
+        if sys.platform == 'darwin':
+            applescript = """
+            tell application "Google Chrome"
+                activate
+            end tell
+            """
+            os.system(f"osascript -e '{applescript}'")
+        elif sys.platform.startswith('win'):
+            # Windows PowerShell activate Chrome
+            ps_cmd = (
+                "$wshell = New-Object -ComObject wscript.shell; "
+                "$chrome = Get-Process -Name chrome -ErrorAction SilentlyContinue | Select-Object -First 1; "
+                "if ($chrome) { $wshell.AppActivate($chrome.Id) }"
+            )
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], check=False)
+        time.sleep(1.0) # Small safety pause to let Chrome render on top
+    except Exception as e:
+        print(f"[Focus Notice] Error focusing Chrome: {e}")
 
 
 def type_characters_humanlike(text, wpm=65):
@@ -104,7 +114,7 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone-to-PC Auto-Typer</title>
+    <title>Faah Autonomous - Auto Typer</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -243,7 +253,7 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h2>⚡ Phone-to-PC Auto-Typer</h2>
+        <h2>⚡ Faah Autonomous</h2>
         <div class="desc">Types into active Google Chrome window with realistic human cadence.</div>
         
         <textarea id="textInput" placeholder="Paste or type text here..."></textarea>
@@ -326,7 +336,7 @@ def handle_type():
 
 
 def show_qr_code(url):
-    """Generates a clean QR code image and opens it in macOS Preview."""
+    """Generates a clean QR code image and opens it in the default viewer."""
     try:
         qr = qrcode.QRCode(box_size=10, border=3)
         qr.add_data(url)
@@ -334,7 +344,11 @@ def show_qr_code(url):
         img = qr.make_image(fill_color="black", back_color="white")
         qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "connect_qr.png")
         img.save(qr_path)
-        subprocess.run(["open", qr_path], check=False)
+        
+        if sys.platform == 'darwin':
+            subprocess.run(["open", qr_path], check=False)
+        elif sys.platform.startswith('win'):
+            os.startfile(qr_path)
     except Exception as e:
         print(f"Notice opening QR image: {e}")
 
@@ -345,11 +359,11 @@ if __name__ == '__main__':
     url = f"http://{local_ip}:{port}"
 
     print("=" * 60)
-    print("🚀 Phone-to-PC Auto-Typer Server Running!")
+    print("🚀 Faah Autonomous Running!")
     print(f"🔗 Connect your phone to: {url}")
     print("=" * 60)
 
-    # Show QR code image via Preview
+    # Show QR code image
     show_qr_code(url)
 
     # Start Flask server
