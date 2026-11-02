@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# App generated
+connect_qr.png
+hotkey_config.json
